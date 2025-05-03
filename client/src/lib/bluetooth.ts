@@ -1,8 +1,69 @@
 export interface ScaleMeasurement {
   weight?: number;
-  bmi?: number;
-  bodyFat?: number;
-  muscleMass?: number;
+  timer?: number;
+  batteryLevel?: number;
+  flowRate?: number;
+}
+
+// Web Bluetooth API types
+declare global {
+  interface Navigator {
+    bluetooth: {
+      requestDevice(options: RequestDeviceOptions): Promise<BluetoothDevice>;
+    };
+  }
+
+  interface RequestDeviceOptions {
+    filters?: Array<{
+      services?: string[];
+      name?: string;
+      namePrefix?: string;
+    }>;
+    optionalServices?: string[];
+    acceptAllDevices?: boolean;
+  }
+
+  interface BluetoothDevice {
+    id: string;
+    name?: string;
+    gatt?: BluetoothRemoteGATTServer;
+    addEventListener(type: string, listener: EventListener): void;
+    removeEventListener(type: string, listener: EventListener): void;
+  }
+
+  interface BluetoothRemoteGATTServer {
+    device: BluetoothDevice;
+    connected: boolean;
+    connect(): Promise<BluetoothRemoteGATTServer>;
+    disconnect(): void;
+    getPrimaryService(service: string): Promise<BluetoothRemoteGATTService>;
+  }
+
+  interface BluetoothRemoteGATTService {
+    device: BluetoothDevice;
+    uuid: string;
+    getCharacteristic(characteristic: string): Promise<BluetoothRemoteGATTCharacteristic>;
+  }
+
+  interface BluetoothRemoteGATTCharacteristic {
+    service: BluetoothRemoteGATTService;
+    uuid: string;
+    properties: {
+      broadcast: boolean;
+      read: boolean;
+      writeWithoutResponse: boolean;
+      write: boolean;
+      notify: boolean;
+      indicate: boolean;
+      authenticatedSignedWrites: boolean;
+    };
+    value?: DataView;
+    startNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+    stopNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+    readValue(): Promise<DataView>;
+    addEventListener(type: string, listener: EventListener): void;
+    removeEventListener(type: string, listener: EventListener): void;
+  }
 }
 
 export interface BluetoothState {
@@ -24,21 +85,20 @@ export const initialBluetoothState: BluetoothState = {
   characteristics: new Map(),
   measurements: {
     weight: undefined,
-    bmi: undefined,
-    bodyFat: undefined,
-    muscleMass: undefined,
+    timer: undefined,
+    batteryLevel: undefined,
+    flowRate: undefined,
   },
 };
 
-// Typically the weight scale service UUID (weight_service)
-// This is a standard service for Bluetooth scale devices
-export const WEIGHT_SCALE_SERVICE = '0x181D';
+// Black Coffee Scale device UUIDs from their documentation
+export const BLACK_COFFEE_SCALE_SERVICE = '0000fff0-0000-1000-8000-00805f9b34fb';
+export const BATTERY_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
 
-// Standard characteristic UUID for weight measurement
-export const WEIGHT_MEASUREMENT_CHARACTERISTIC = '0x2A9D';
-
-// Body composition measurement characteristic
-export const BODY_COMPOSITION_CHARACTERISTIC = '0x2A9C';
+// Black Coffee Scale characteristics
+export const BLACK_COFFEE_WEIGHT_CHARACTERISTIC = '0000fff1-0000-1000-8000-00805f9b34fb';
+export const BLACK_COFFEE_COMMAND_CHARACTERISTIC = '0000fff2-0000-1000-8000-00805f9b34fb';
+export const BATTERY_CHARACTERISTIC = '00002a19-0000-1000-8000-00805f9b34fb';
 
 /**
  * Get user-friendly error message
@@ -56,91 +116,66 @@ export function getErrorMessage(error: any): string {
 }
 
 /**
- * Parse weight measurement data according to Bluetooth GATT standard
+ * Parse weight data from Black Coffee Scale
+ * Based on the GitHub implementation: https://github.com/graphefruit/Beanconqueror/blob/master/src/classes/devices/blackcoffeeScale.ts
  */
-export function parseWeightMeasurement(value: DataView): number | undefined {
+export function parseBlackCoffeeWeightData(value: DataView): Partial<ScaleMeasurement> {
   try {
-    // The weight value is typically in the first 2 bytes (uint16)
-    // The format depends on the specific scale, but common format is:
-    // Flags (1 byte) + Weight (2 bytes) in units of 0.005 kg
-    
-    const flags = value.getUint8(0);
-    const weightInUnits = value.getUint16(1, true); // true for little-endian
-    
-    // The weight unit flag is typically bit 0 of flags (0 = kg, 1 = lb)
-    const isImperial = (flags & 0x01) === 0x01;
-    
-    // Convert to kg if imperial
-    const weightInKg = isImperial 
-      ? weightInUnits * 0.005 * 0.45359237 // Convert from lb to kg
-      : weightInUnits * 0.005; // Scale units to kg
-      
-    return Number(weightInKg.toFixed(1));
-  } catch (e) {
-    console.error('Error parsing weight data:', e);
-    return undefined;
-  }
-}
+    // Extract the value bytes from the data view
+    const byteLength = value.byteLength;
+    const valueBytes = new Uint8Array(byteLength);
+    for (let i = 0; i < byteLength; i++) {
+      valueBytes[i] = value.getUint8(i);
+    }
 
-/**
- * Parse body composition data
- */
-export function parseBodyComposition(value: DataView): Partial<ScaleMeasurement> {
-  try {
-    // This is a simplified parser - real implementations need to follow
-    // the Bluetooth GATT Body Composition Measurement characteristic specification
-    
-    const flags = value.getUint16(0, true);
-    let offset = 2;
-    
-    // Skip past time stamp if present (bit 0)
-    if (flags & 0x01) {
-      offset += 7; // Year (2) + Month (1) + Day (1) + Hour (1) + Min (1) + Sec (1)
+    // Check the value format based on the GitHub code
+    // Format: [FF, AA, weight bytes, battery byte, ...]
+    if (valueBytes[0] === 0xFF && valueBytes[1] === 0xAA && valueBytes.length >= 7) {
+      // Weight is stored in bytes 2-5 (4 bytes) in 0.1g precision
+      const weightData = (valueBytes[2] << 24) | (valueBytes[3] << 16) | (valueBytes[4] << 8) | valueBytes[5];
+      const weight = weightData / 10; // Convert to grams with 0.1g precision
+      
+      // Battery level is byte 6 (percentage)
+      const batteryLevel = valueBytes[6];
+      
+      // Return the parsed data
+      return {
+        weight: Number((weight / 1000).toFixed(3)), // Convert to kg with 0.001kg precision
+        batteryLevel: batteryLevel
+      };
     }
     
-    // Skip user ID if present (bit 1)
-    if (flags & 0x02) {
-      offset += 1;
-    }
-    
-    // Parse the body fat percentage if present (bit 2)
-    let bodyFat: number | undefined;
-    if (flags & 0x04) {
-      bodyFat = value.getUint16(offset, true) * 0.1;
-      offset += 2;
-    }
-    
-    // Parse muscle mass if available (typically comes after body fat)
-    // This depends on the specific scale implementation
-    let muscleMass: number | undefined;
-    if (offset + 2 <= value.byteLength) {
-      muscleMass = value.getUint16(offset, true) * 0.1;
-    }
-    
-    return {
-      bodyFat: bodyFat !== undefined ? Number(bodyFat.toFixed(1)) : undefined,
-      muscleMass: muscleMass !== undefined ? Number(muscleMass.toFixed(1)) : undefined,
-    };
+    return {};
   } catch (e) {
-    console.error('Error parsing body composition data:', e);
+    console.error('Error parsing Black Coffee Scale data:', e);
     return {};
   }
 }
 
 /**
- * Simulate measurements for demo/testing purposes
+ * Calculate flow rate based on weight changes
+ */
+export function calculateFlowRate(currentWeight: number, previousWeight: number, timeDiff: number): number {
+  // Flow rate in g/s
+  const weightDiff = Math.abs(currentWeight - previousWeight); // in kg
+  const flowRate = (weightDiff * 1000) / (timeDiff / 1000); // Convert to g/s
+  return Number(flowRate.toFixed(1));
+}
+
+/**
+ * Simulate measurements for demo/testing purposes for coffee scale
  */
 export function simulateMeasurements(): ScaleMeasurement {
-  // Create base measurements with small random variations
-  const baseWeight = 70 + Math.random() * 10;
-  const baseBmi = 22 + Math.random() * 3;
-  const baseFat = 18 + Math.random() * 5; 
-  const baseMuscle = 50 + Math.random() * 8;
+  // Coffee measurements vary between 15-22g for espresso
+  const baseWeight = (18 + Math.random() * 4) / 1000; // in kg (typical coffee dose 18-22g)
+  const baseTimer = Math.floor(Date.now() / 1000) % 60; // Simple timer in seconds
+  const baseBatteryLevel = 80 + Math.floor(Math.random() * 20); // Battery level 80-100%
+  const baseFlowRate = 1.2 + Math.random() * 0.6; // Flow rate g/s for espresso (1.2-1.8g/s)
   
   return {
-    weight: Number(baseWeight.toFixed(1)),
-    bmi: Number(baseBmi.toFixed(1)),
-    bodyFat: Number(baseFat.toFixed(1)),
-    muscleMass: Number(baseMuscle.toFixed(1))
+    weight: Number(baseWeight.toFixed(3)), // 0.018-0.022kg (18-22g) with 0.001kg precision
+    timer: baseTimer,
+    batteryLevel: baseBatteryLevel,
+    flowRate: Number(baseFlowRate.toFixed(1))
   };
 }
