@@ -40,16 +40,16 @@ jobs:
 
       # Copy index.html to 404.html to handle client-side routing
       - name: Configure SPA routing
-        run: cp dist/index.html dist/404.html
+        run: cp dist/public/index.html dist/public/404.html
 
       # Create a special .nojekyll file to disable Jekyll processing
       - name: Disable Jekyll
-        run: touch dist/.nojekyll
+        run: touch dist/public/.nojekyll
         
       - name: Upload build artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./dist/public
 
   deploy:
     name: Deploy
