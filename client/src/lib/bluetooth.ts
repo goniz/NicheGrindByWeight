@@ -1,7 +1,6 @@
 export interface ScaleMeasurement {
   weight?: number;
   timer?: number;
-  batteryLevel?: number;
   flowRate?: number;
 }
 
@@ -86,19 +85,16 @@ export const initialBluetoothState: BluetoothState = {
   measurements: {
     weight: undefined,
     timer: undefined,
-    batteryLevel: undefined,
     flowRate: undefined,
   },
 };
 
 // Black Coffee Scale device UUIDs from their documentation
-export const BLACK_COFFEE_SCALE_SERVICE = '0000fff0-0000-1000-8000-00805f9b34fb';
-export const BATTERY_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
+export const BLACK_COFFEE_SCALE_SERVICE = '0000ffb0-0000-1000-8000-00805f9b34fb';
 
 // Black Coffee Scale characteristics
 export const BLACK_COFFEE_WEIGHT_CHARACTERISTIC = '0000fff1-0000-1000-8000-00805f9b34fb';
 export const BLACK_COFFEE_COMMAND_CHARACTERISTIC = '0000fff2-0000-1000-8000-00805f9b34fb';
-export const BATTERY_CHARACTERISTIC = '00002a19-0000-1000-8000-00805f9b34fb';
 
 /**
  * Get user-friendly error message
@@ -129,19 +125,15 @@ export function parseBlackCoffeeWeightData(value: DataView): Partial<ScaleMeasur
     }
 
     // Check the value format based on the GitHub code
-    // Format: [FF, AA, weight bytes, battery byte, ...]
-    if (valueBytes[0] === 0xFF && valueBytes[1] === 0xAA && valueBytes.length >= 7) {
+    // Format: [FF, AA, weight bytes, ...]
+    if (valueBytes[0] === 0xFF && valueBytes[1] === 0xAA && valueBytes.length >= 6) {
       // Weight is stored in bytes 2-5 (4 bytes) in 0.1g precision
       const weightData = (valueBytes[2] << 24) | (valueBytes[3] << 16) | (valueBytes[4] << 8) | valueBytes[5];
       const weight = weightData / 10; // Convert to grams with 0.1g precision
       
-      // Battery level is byte 6 (percentage)
-      const batteryLevel = valueBytes[6];
-      
       // Return the parsed data
       return {
-        weight: Number((weight / 1000).toFixed(3)), // Convert to kg with 0.001kg precision
-        batteryLevel: batteryLevel
+        weight: Number((weight / 1000).toFixed(3)) // Convert to kg with 0.001kg precision
       };
     }
     
@@ -162,20 +154,4 @@ export function calculateFlowRate(currentWeight: number, previousWeight: number,
   return Number(flowRate.toFixed(1));
 }
 
-/**
- * Simulate measurements for demo/testing purposes for coffee scale
- */
-export function simulateMeasurements(): ScaleMeasurement {
-  // Coffee measurements vary between 15-22g for espresso
-  const baseWeight = (18 + Math.random() * 4) / 1000; // in kg (typical coffee dose 18-22g)
-  const baseTimer = Math.floor(Date.now() / 1000) % 60; // Simple timer in seconds
-  const baseBatteryLevel = 80 + Math.floor(Math.random() * 20); // Battery level 80-100%
-  const baseFlowRate = 1.2 + Math.random() * 0.6; // Flow rate g/s for espresso (1.2-1.8g/s)
-  
-  return {
-    weight: Number(baseWeight.toFixed(3)), // 0.018-0.022kg (18-22g) with 0.001kg precision
-    timer: baseTimer,
-    batteryLevel: baseBatteryLevel,
-    flowRate: Number(baseFlowRate.toFixed(1))
-  };
-}
+

@@ -4,13 +4,10 @@ import {
   initialBluetoothState, 
   getErrorMessage, 
   BLACK_COFFEE_SCALE_SERVICE,
-  BATTERY_SERVICE,
   BLACK_COFFEE_WEIGHT_CHARACTERISTIC,
   BLACK_COFFEE_COMMAND_CHARACTERISTIC,
-  BATTERY_CHARACTERISTIC,
   parseBlackCoffeeWeightData,
   calculateFlowRate,
-  simulateMeasurements,
   ScaleMeasurement
 } from '@/lib/bluetooth';
 
@@ -81,42 +78,12 @@ function bluetoothReducer(state: BluetoothState, action: BluetoothAction): Bluet
 }
 
 // Custom hook for Bluetooth functionality
-export function useBluetooth(isDemoMode = false) {
+export function useBluetooth() {
   const [state, dispatch] = useReducer(bluetoothReducer, initialBluetoothState);
 
   // Function to connect to a Bluetooth device
   const connect = useCallback(async () => {
     if (state.connecting || state.connected) return;
-    
-    // For demo mode, simulate a connection
-    if (isDemoMode) {
-      dispatch({ type: ActionType.CONNECTING });
-      
-      // Simulate connection delay
-      setTimeout(() => {
-        const mockDevice = { 
-          name: 'Demo Scale',
-          gatt: { connected: true },
-          addEventListener: () => {},
-          removeEventListener: () => {}
-        } as unknown as BluetoothDevice;
-        
-        const mockServer = {} as BluetoothRemoteGATTServer;
-        const mockCharacteristics = new Map();
-        
-        dispatch({ 
-          type: ActionType.CONNECTED, 
-          device: mockDevice, 
-          server: mockServer, 
-          characteristics: mockCharacteristics 
-        });
-        
-        // Start simulating measurements
-        simulateDemoMeasurements();
-      }, 2000);
-      
-      return;
-    }
     
     // Check if Web Bluetooth API is available
     if (!navigator.bluetooth) {
@@ -131,8 +98,7 @@ export function useBluetooth(isDemoMode = false) {
       const device = await navigator.bluetooth.requestDevice({
         filters: [
           { services: [BLACK_COFFEE_SCALE_SERVICE] }
-        ],
-        optionalServices: [BATTERY_SERVICE, 'device_information']
+        ]
       });
       
       // Add event listener for disconnection
@@ -167,29 +133,7 @@ export function useBluetooth(isDemoMode = false) {
         console.warn('Black Coffee Scale command characteristic not found:', e);
       }
       
-      // Try to get battery service
-      try {
-        const batteryService = await server.getPrimaryService(BATTERY_SERVICE);
-        const batteryChar = await batteryService.getCharacteristic(BATTERY_CHARACTERISTIC);
-        characteristics.set(BATTERY_CHARACTERISTIC, batteryChar);
-        
-        // Read battery level
-        const batteryValue = await batteryChar.readValue();
-        const batteryLevel = batteryValue.getUint8(0);
-        
-        dispatch({
-          type: ActionType.UPDATE_MEASUREMENTS,
-          measurements: { batteryLevel }
-        });
-        
-        // Set up notifications for battery changes if supported
-        if (batteryChar.properties.notify) {
-          await batteryChar.startNotifications();
-          batteryChar.addEventListener('characteristicvaluechanged', handleBatteryChange);
-        }
-      } catch (e) {
-        console.warn('Battery service not available:', e);
-      }
+      // Note: Battery service has been removed as requested
       
       // Update state with connected device
       dispatch({
@@ -203,7 +147,7 @@ export function useBluetooth(isDemoMode = false) {
       console.error('Bluetooth connection error:', error);
       dispatch({ type: ActionType.ERROR, error: getErrorMessage(error) });
     }
-  }, [state.connecting, state.connected, isDemoMode]);
+  }, [state.connecting, state.connected]);
   
   // Store previous weight and timestamp for flow rate calculation
   const prevWeightRef = useRef<number | null>(null);
@@ -255,36 +199,12 @@ export function useBluetooth(isDemoMode = false) {
         prevWeightRef.current = currentWeight;
         lastTimestampRef.current = currentTime;
       }
-      
-      // Check for battery level
-      if (scaleData.batteryLevel !== undefined) {
-        dispatch({
-          type: ActionType.UPDATE_MEASUREMENTS,
-          measurements: { batteryLevel: scaleData.batteryLevel }
-        });
-      }
     } catch (error) {
       console.error('Error handling coffee scale data:', error);
     }
   }, []);
   
-  // Handle battery level changes
-  const handleBatteryChange = useCallback((event: Event) => {
-    try {
-      const characteristic = event.target as unknown as BluetoothRemoteGATTCharacteristic;
-      const dataView = characteristic.value as DataView;
-      
-      // Battery level is a single byte percentage value
-      const batteryLevel = dataView.getUint8(0);
-      
-      dispatch({
-        type: ActionType.UPDATE_MEASUREMENTS,
-        measurements: { batteryLevel }
-      });
-    } catch (error) {
-      console.error('Error handling battery change:', error);
-    }
-  }, []);
+
   
   // Disconnect from the device
   const disconnect = useCallback(() => {
@@ -309,117 +229,15 @@ export function useBluetooth(isDemoMode = false) {
   
   // Handle disconnection
   const onDisconnected = useCallback(() => {
-    // Clean up interval if in demo mode
-    if (isDemoMode && demoIntervalRef.current) {
-      clearInterval(demoIntervalRef.current);
-      demoIntervalRef.current = null;
-    }
-    
     dispatch({ type: ActionType.DISCONNECTED });
-  }, [isDemoMode]);
+  }, []);
   
   // Clear error messages
   const clearError = useCallback(() => {
     dispatch({ type: ActionType.CLEAR_ERROR });
   }, []);
   
-  // Simulate measurements for demo mode
-  const demoIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const simulateDemoMeasurements = useCallback(() => {
-    // Initial simulation of a coffee dose being measured
-    // Start with empty scale
-    let isPouring = false;
-    let baseWeight = 0; // empty scale
-    let baseTimer = 0;
-    let baseBatteryLevel = 85;
-    let baseFlowRate = 0;
-    let pourStartTime = 0;
-    let targetWeight = (18 + Math.random() * 4); // Target weight 18-22g
-    
-    // Update with initial empty scale values
-    dispatch({
-      type: ActionType.UPDATE_MEASUREMENTS,
-      measurements: {
-        weight: 0,
-        timer: 0,
-        batteryLevel: baseBatteryLevel,
-        flowRate: 0
-      }
-    });
-    
-    // Set up interval for a simulated pour
-    demoIntervalRef.current = setInterval(() => {
-      // Current time in simulation
-      const now = Date.now();
-      
-      // If not pouring and scale is empty, randomly start a pour
-      if (!isPouring && baseWeight < 0.001 && Math.random() > 0.7) {
-        isPouring = true;
-        pourStartTime = now;
-        baseTimer = 0;
-      }
-      
-      // If pouring, increase weight towards target
-      if (isPouring) {
-        // Update timer
-        baseTimer = Math.floor((now - pourStartTime) / 1000);
-        
-        // Calculate remaining weight to target
-        const remaining = targetWeight - baseWeight * 1000;
-        
-        if (remaining > 0.1) {
-          // Simulate flow rate changes during pour
-          if (baseTimer < 5) {
-            // Initial fast pour
-            baseFlowRate = 1.5 + (Math.random() * 0.3);
-            baseWeight += baseFlowRate / 1000; // Convert g/s to kg/s
-          } else if (baseTimer < 15) {
-            // Slow down as we approach target
-            baseFlowRate = 0.8 + (Math.random() * 0.4);
-            baseWeight += baseFlowRate / 1000;
-          } else {
-            // Final drips
-            baseFlowRate = 0.2 + (Math.random() * 0.2);
-            baseWeight += baseFlowRate / 1000;
-          }
-        } else {
-          // Reached target weight
-          isPouring = false;
-          baseFlowRate = 0;
-          
-          // Randomly reset after a while (empty the scale)
-          if (Math.random() > 0.8) {
-            baseWeight = 0;
-            baseTimer = 0;
-          }
-        }
-      } else {
-        // Small random fluctuations when not pouring (scale stability)
-        if (baseWeight > 0) {
-          baseWeight += (Math.random() - 0.5) * 0.0001;
-        }
-        baseFlowRate = 0;
-      }
-      
-      // Ensure weight doesn't exceed target
-      if (baseWeight * 1000 > targetWeight) {
-        baseWeight = targetWeight / 1000;
-      }
-      
-      // Update the state with new values
-      dispatch({
-        type: ActionType.UPDATE_MEASUREMENTS,
-        measurements: {
-          weight: Number(baseWeight.toFixed(3)), // 3 decimal places (g precision)
-          timer: baseTimer,
-          batteryLevel: baseBatteryLevel,
-          flowRate: Number(baseFlowRate.toFixed(1))
-        }
-      });
-    }, 200); // More frequent updates for smoother simulation
-    
-  }, []);
+
   
   // Clean up on unmount
   useEffect(() => {
@@ -427,23 +245,8 @@ export function useBluetooth(isDemoMode = false) {
       if (state.connected) {
         disconnect();
       }
-      
-      if (demoIntervalRef.current) {
-        clearInterval(demoIntervalRef.current);
-      }
     };
   }, [state.connected, disconnect]);
-  
-  // Check for demo mode in query params
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const demo = urlParams.get('demo') === 'true';
-    
-    if (demo && !isDemoMode) {
-      window.history.replaceState(null, '', '?demo=true');
-      location.reload();
-    }
-  }, [isDemoMode]);
   
   return {
     ...state,

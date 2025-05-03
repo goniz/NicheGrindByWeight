@@ -79,27 +79,7 @@ export function MeasurementDisplay({
           </CardContent>
         </Card>
 
-        {/* Battery Level Card */}
-        <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-200">
-          <CardContent className="p-5">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-amber-800 font-semibold">Battery</h3>
-              <svg className="w-6 h-6 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="7" width="20" height="10" rx="2" ry="2"></rect>
-                <line x1="22" y1="11" x2="24" y2="11"></line>
-                <line x1="6" y1="7" x2="6" y2="17"></line>
-                <line x1="10" y1="7" x2="10" y2="17"></line>
-                <line x1="14" y1="7" x2="14" y2="17"></line>
-              </svg>
-            </div>
-            <div className="text-center">
-              <span className="text-5xl font-mono font-medium text-amber-900">
-                {measurements.batteryLevel !== undefined ? measurements.batteryLevel : '--'}
-              </span>
-              <span className="text-xl font-medium text-amber-700 ml-2">%</span>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
     </div>
   );
