@@ -26,7 +26,7 @@ export function ConnectionStatus({
   return (
     <div className="mb-8 flex justify-center">
       <div 
-        className="rounded-lg bg-white shadow p-4 w-full max-w-md flex items-center justify-between"
+        className="rounded-lg bg-gradient-to-r from-amber-50 to-white shadow-md border border-amber-200 p-4 w-full max-w-md flex items-center justify-between"
         data-state={status}
       >
         <div className="flex items-center">
@@ -35,29 +35,37 @@ export function ConnectionStatus({
               "w-3 h-3 rounded-full mr-3",
               {
                 "bg-neutral-300": status === 'disconnected',
-                "bg-[#4CAF50]": status === 'connected',
-                "bg-yellow-400 animate-pulse": status === 'connecting'
+                "bg-emerald-500": status === 'connected',
+                "bg-amber-400 animate-pulse": status === 'connecting'
               }
             )}
             aria-hidden="true"
           />
-          <span className="font-medium">
-            {status === 'connected' && 'Connected'}
-            {status === 'connecting' && 'Connecting...'}
-            {status === 'disconnected' && 'Disconnected'}
-          </span>
+          <div className="flex flex-col">
+            <span className="font-medium text-amber-900">
+              {status === 'connected' && 'Connected to Coffee Scale'}
+              {status === 'connecting' && 'Connecting to Coffee Scale...'}
+              {status === 'disconnected' && 'Coffee Scale Disconnected'}
+            </span>
+            {status === 'connected' && (
+              <span className="text-xs text-amber-700">Receiving data from Black Coffee Scale</span>
+            )}
+          </div>
         </div>
         <Button
           variant={isConnected ? "destructive" : "default"}
           onClick={handleClick}
           disabled={isConnecting}
-          className={cn({
-            "bg-[#2196F3] hover:bg-blue-600": !isConnected,
-            "bg-neutral-700 hover:bg-neutral-800": isConnected,
-            "opacity-75": isConnecting
-          })}
+          className={cn(
+            "transition-all duration-200",
+            {
+              "bg-amber-600 hover:bg-amber-700 text-white": !isConnected && !isConnecting,
+              "bg-red-500 hover:bg-red-600": isConnected,
+              "bg-amber-400 text-amber-900 cursor-wait": isConnecting
+            }
+          )}
         >
-          {isConnected ? "Disconnect" : "Connect Scale"}
+          {isConnected ? "Disconnect" : isConnecting ? "Connecting..." : "Connect Scale"}
         </Button>
       </div>
     </div>

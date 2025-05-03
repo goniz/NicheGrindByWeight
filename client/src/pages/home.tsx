@@ -36,13 +36,18 @@ export default function Home() {
   }, [bluetooth]);
   
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans">
+    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-amber-100 text-amber-900 font-sans">
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <header className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-neutral-800 mb-2">Smart Scale Monitor</h1>
-          <p className="text-neutral-600">
-            Connect to your Bluetooth scale to view measurements
-            {isDemoMode && <span className="ml-2 bg-green-100 text-green-800 text-xs font-medium rounded px-2 py-0.5">Demo Mode</span>}
+          <div className="flex items-center justify-center mb-3">
+            <svg className="h-8 w-8 text-amber-600 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M2 8h20M6 8v9a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V8M12 12v3M4 4h16"></path>
+            </svg>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-amber-500 bg-clip-text text-transparent">Coffee Scale App</h1>
+          </div>
+          <p className="text-amber-700">
+            Connect to your Black Coffee Scale for precise brewing
+            {isDemoMode && <span className="ml-2 bg-amber-200 text-amber-800 text-xs font-medium rounded px-2 py-0.5">Demo Mode</span>}
           </p>
         </header>
         
@@ -54,7 +59,7 @@ export default function Home() {
         
         <MeasurementDisplay 
           measurements={bluetooth.measurements} 
-          visible={bluetooth.connected} 
+          visible={bluetooth.connected || isDemoMode} 
         />
         
         <Instructions />
@@ -64,16 +69,16 @@ export default function Home() {
           onClose={bluetooth.clearError} 
         />
         
-        <footer className="text-center text-neutral-500 text-sm mt-12">
+        <footer className="text-center text-amber-600 text-sm mt-12">
           <p>
-            Smart Scale Monitor | 
+            Coffee Scale App | Based on Black Coffee Scale Protocol | 
             <a 
-              href="https://github.com" 
+              href="https://github.com/graphefruit/Beanconqueror" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-[#2196F3] hover:underline ml-1"
+              className="text-amber-700 hover:underline ml-1 font-medium"
             >
-              GitHub
+              Beanconqueror Project
             </a>
           </p>
         </footer>
