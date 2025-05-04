@@ -6,11 +6,8 @@ import { Instructions } from "@/components/instructions";
 import { Notification } from "@/components/notification";
 
 export default function Home() {
-  // Check if demo mode is enabled via URL parameter
-  const isDemoMode = new URLSearchParams(window.location.search).get('demo') === 'true';
-  
   // Use Bluetooth hook
-  const bluetooth = useBluetooth(isDemoMode);
+  const bluetooth = useBluetooth();
   
   // Determine connection status
   let connectionStatus: 'connected' | 'connecting' | 'disconnected' = 'disconnected';
@@ -47,7 +44,6 @@ export default function Home() {
           </div>
           <p className="text-amber-700">
             Connect to your Black Coffee Scale for precise brewing
-            {isDemoMode && <span className="ml-2 bg-amber-200 text-amber-800 text-xs font-medium rounded px-2 py-0.5">Demo Mode</span>}
           </p>
         </header>
         
@@ -59,7 +55,7 @@ export default function Home() {
         
         <MeasurementDisplay 
           measurements={bluetooth.measurements} 
-          visible={bluetooth.connected || isDemoMode} 
+          visible={bluetooth.connected} 
         />
         
         <Instructions />

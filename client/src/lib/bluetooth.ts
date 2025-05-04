@@ -113,7 +113,7 @@ export function getErrorMessage(error: any): string {
 
 /**
  * Parse weight data from Black Coffee Scale
- * Based on the GitHub implementation: https://github.com/graphefruit/Beanconqueror/blob/master/src/classes/devices/blackcoffeeScale.ts
+ * Based on the GitHub implementation and provided example code
  */
 export function parseBlackCoffeeWeightData(value: DataView): Partial<ScaleMeasurement> {
   try {
@@ -124,19 +124,35 @@ export function parseBlackCoffeeWeightData(value: DataView): Partial<ScaleMeasur
       valueBytes[i] = value.getUint8(i);
     }
 
-    // Check the value format based on the GitHub code
-    // Format: [FF, AA, weight bytes, ...]
-    if (valueBytes[0] === 0xFF && valueBytes[1] === 0xAA && valueBytes.length >= 6) {
-      // Weight is stored in bytes 2-5 (4 bytes) in 0.1g precision
+    // Convert to hex for the new parsing method
+    const hex = Array.from(valueBytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    // Check if we have enough data to parse
+    if (valueBytes.length > 14) {
+      // Parse according to provided example
+      const isNegative = hex[4] === '8' || hex[4] === 'c';
+      const hexWeight = hex.slice(7, 14);
+      // Weight is in gram, convert to kg
+      const weight = ((isNegative ? -1 : 1) * parseInt(hexWeight, 16)) / 1000;
+      
+      // Return the parsed data with weight in kg
+      return {
+        weight: Number(weight.toFixed(3))
+      };
+    } else if (valueBytes[0] === 0xFF && valueBytes[1] === 0xAA && valueBytes.length >= 6) {
+      // Fallback to original method if data format matches
       const weightData = (valueBytes[2] << 24) | (valueBytes[3] << 16) | (valueBytes[4] << 8) | valueBytes[5];
       const weight = weightData / 10; // Convert to grams with 0.1g precision
       
-      // Return the parsed data
       return {
         weight: Number((weight / 1000).toFixed(3)) // Convert to kg with 0.001kg precision
       };
     }
     
+    // If we couldn't parse the data with either method
+    console.warn('Bluetooth incoming statusUpdate has unrecognized format');
     return {};
   } catch (e) {
     console.error('Error parsing Black Coffee Scale data:', e);

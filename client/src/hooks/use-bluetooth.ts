@@ -213,6 +213,11 @@ export function useBluetooth() {
       state.characteristics.forEach(char => {
         if (char.properties.notify) {
           try {
+            // Remove event listener first
+            if (char.uuid === BLACK_COFFEE_WEIGHT_CHARACTERISTIC) {
+              char.removeEventListener('characteristicvaluechanged', handleCoffeeScaleData);
+            }
+            // Then stop notifications
             char.stopNotifications();
           } catch (e) {
             console.warn('Error stopping notifications:', e);
@@ -225,7 +230,7 @@ export function useBluetooth() {
     }
     
     onDisconnected();
-  }, [state.device, state.characteristics]);
+  }, [state.device, state.characteristics, handleCoffeeScaleData]);
   
   // Handle disconnection
   const onDisconnected = useCallback(() => {
