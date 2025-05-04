@@ -1,4 +1,6 @@
-import { Switch, Route, Router } from "wouter";
+import { Router, Switch, Route } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocationProperty, useHashLocation } from "wouter/use-hash-location";
 import { queryClient } from "./lib/queryClient";
 
 // Get base path from environment or default to '/'
@@ -11,7 +13,7 @@ import Home from "@/pages/home";
 
 function AppRouter() {
   return (
-    <Router base={basePath}>
+    <Router hook={useHashLocation}>
       <Switch>
         <Route path="/" component={Home} />
         {/* Fallback to 404 */}
