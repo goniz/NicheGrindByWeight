@@ -71,15 +71,7 @@ export default function Home() {
         
         <footer className="text-center text-amber-600 text-sm mt-12">
           <p>
-            Coffee Scale App | Based on Black Coffee Scale Protocol | 
-            <a 
-              href="https://github.com/graphefruit/Beanconqueror" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-amber-700 hover:underline ml-1 font-medium"
-            >
-              Beanconqueror Project
-            </a>
+            Coffee Scale App | Based on Black Coffee Scale Protocol
           </p>
         </footer>
       </div>
