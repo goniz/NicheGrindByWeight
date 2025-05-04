@@ -157,45 +157,26 @@ export function useBluetooth() {
   const handleCoffeeScaleData = useCallback((event: Event) => {
     try {
       const characteristic = event.target as unknown as BluetoothRemoteGATTCharacteristic;
-      const dataView = characteristic.value as DataView;
+      const scaleData = parseBlackCoffeeWeightData(characteristic.value as DataView);
       
-      // Parse the data using our Black Coffee Scale parser
-      const scaleData = parseBlackCoffeeWeightData(dataView);
-      
-      // Update measurements state with weight
       if (scaleData.weight !== undefined) {
-        // Calculate flow rate if we have previous weight
         const currentWeight = scaleData.weight;
         const currentTime = Date.now();
+        const timeDiff = currentTime - lastTimestampRef.current;
         
-        if (prevWeightRef.current !== null) {
-          const timeDiff = currentTime - lastTimestampRef.current;
-          
-          // Only calculate flow rate if time difference is reasonable (100ms-3s)
-          if (timeDiff > 100 && timeDiff < 3000 && currentWeight !== prevWeightRef.current) {
-            const flowRate = calculateFlowRate(currentWeight, prevWeightRef.current, timeDiff);
-            
-            // Update flow rate in state
-            dispatch({
-              type: ActionType.UPDATE_MEASUREMENTS,
-              measurements: { flowRate }
-            });
-          }
+        let measurements: Partial<BluetoothState['measurements']> = {
+          weight: currentWeight,
+          timer: Math.floor(timeDiff / 1000)
+        };
+        
+        if (prevWeightRef.current !== null && 
+            timeDiff > 100 && timeDiff < 3000 && 
+            currentWeight !== prevWeightRef.current) {
+          measurements.flowRate = calculateFlowRate(currentWeight, prevWeightRef.current, timeDiff);
         }
         
-        // Update timer (simulated since scale might not have one)
-        const timer = Math.floor((Date.now() - lastTimestampRef.current) / 1000);
+        dispatch({ type: ActionType.UPDATE_MEASUREMENTS, measurements });
         
-        // Update state with weight and timer
-        dispatch({ 
-          type: ActionType.UPDATE_MEASUREMENTS, 
-          measurements: { 
-            weight: scaleData.weight,
-            timer: timer
-          }
-        });
-        
-        // Save current weight for next calculation
         prevWeightRef.current = currentWeight;
         lastTimestampRef.current = currentTime;
       }
